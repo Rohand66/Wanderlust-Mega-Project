@@ -1,22 +1,32 @@
 #!/bin/bash
 
-# Set the Instance ID and path to the .env file
-INSTANCE_ID="i-046af7a9e1f97e6bf"
-
-# Retrieve the public IP address of the specified EC2 instance
-ipv4_address=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+# Get the Minikube IP address
+ipv4_address=$(minikube ip)
 
 # Path to the .env file
 file_to_find="../backend/.env.docker"
 
-# Check the current FRONTEND_URL in the .env file
-current_url=$(sed -n "4p" $file_to_find)
+# Frontend port (default for Vite dev server or NodePort frontend)
+FRONTEND_PORT=5173
 
-# Update the .env file if the IP address has changed
-if [[ "$current_url" != "FRONTEND_URL=\"http://${ipv4_address}:5173\"" ]]; then
-    if [ -f $file_to_find ]; then
-        sed -i -e "s|FRONTEND_URL.*|FRONTEND_URL=\"http://${ipv4_address}:5173\"|g" $file_to_find
-    else
-        echo "ERROR: File not found."
-    fi
+# Desired line content
+new_value="FRONTEND_URL=\"http://${ipv4_address}:${FRONTEND_PORT}\""
+
+# Check if the file exists
+if [ ! -f "$file_to_find" ]; then
+    echo "❌ ERROR: File not found at $file_to_find"
+    exit 1
 fi
+
+# Get current line containing FRONTEND_URL
+current_url=$(grep 'FRONTEND_URL' "$file_to_find")
+
+# Update only if IP/port has changed
+if [[ "$current_url" != "$new_value" ]]; then
+    echo "🔧 Updating FRONTEND_URL in $file_to_find"
+    sed -i -e "s|FRONTEND_URL.*|$new_value|g" "$file_to_find"
+    echo "✅ Updated: $new_value"
+else
+    echo "✅ No changes needed. Already up to date."
+fi
+
