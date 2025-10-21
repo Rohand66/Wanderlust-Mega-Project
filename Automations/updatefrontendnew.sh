@@ -1,22 +1,32 @@
 #!/bin/bash
 
-# Set the Instance ID and path to the .env file
-INSTANCE_ID="i-046af7a9e1f97e6bf"
-
-# Retrieve the public IP address of the specified EC2 instance
-ipv4_address=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+# Get the Minikube IP address
+ipv4_address=$(minikube ip)
 
 # Path to the .env file
 file_to_find="../frontend/.env.docker"
 
-# Check the current VITE_API_PATH in the .env file
-current_url=$(cat $file_to_find)
+# Port your backend service is exposed on (NodePort)
+BACKEND_PORT=31100
 
-# Update the .env file if the IP address has changed
-if [[ "$current_url" != "VITE_API_PATH=\"http://${ipv4_address}:31100\"" ]]; then
-    if [ -f $file_to_find ]; then
-        sed -i -e "s|VITE_API_PATH.*|VITE_API_PATH=\"http://${ipv4_address}:31100\"|g" $file_to_find
-    else
-        echo "ERROR: File not found."
-    fi
+# Desired line to set
+new_value="VITE_API_PATH=\"http://${ipv4_address}:${BACKEND_PORT}\""
+
+# Check if the file exists
+if [ ! -f "$file_to_find" ]; then
+    echo "❌ ERROR: File not found at $file_to_find"
+    exit 1
 fi
+
+# Check current value
+current_url=$(grep 'VITE_API_PATH' "$file_to_find")
+
+# Update only if the IP has changed
+if [[ "$current_url" != "$new_value" ]]; then
+    echo "🔧 Updating VITE_API_PATH in $file_to_find"
+    sed -i -e "s|VITE_API_PATH.*|$new_value|g" "$file_to_find"
+    echo "✅ Updated: $new_value"
+else
+    echo "✅ No changes needed. Already up to date."
+fi
+
